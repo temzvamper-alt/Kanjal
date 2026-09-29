@@ -1,21 +1,25 @@
--- Murder Mystery 2 ESP
--- Имя + Роль + Дистанция | Трейсеры | Box ESP | Gun ESP | Свой Keybind
+-- Murder Mystery 2 ESP (Full)
+-- Skeleton, Rainbow, Arrows, Thickness, Крутое меню с эффектами
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
 local Camera = workspace.CurrentCamera
 
 local LocalPlayer = Players.LocalPlayer
 
--- ========== НАСТРОЙКИ ==========
+-- ================= НАСТРОЙКИ =================
 local ESPEnabled = false
 local TracersEnabled = false
 local BoxEnabled = false
+local SkeletonEnabled = false
+local RainbowEnabled = false
 local GunESPEnabled = false
 local Keybind = Enum.KeyCode.Insert
 local WaitingForKey = false
+local LineThickness = 1.5
 
 local Colors = {
     Murderer = Color3.fromRGB(255, 50, 50),
@@ -27,86 +31,271 @@ local Colors = {
 
 local PlayerData = {}
 local GunHighlights = {}
+local RainbowHue = 0
 
--- ========== GUI ==========
+-- ================= GUI =================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "MM2ESP"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = CoreGui
 
+-- Основное меню
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 230, 0, 300)
-Main.Position = UDim2.new(0, 20, 0.35, 0)
-Main.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
+Main.Name = "Main"
+Main.Size = UDim2.new(0, 240, 0, 420)
+Main.Position = UDim2.new(0, 25, 0.25, 0)
+Main.BackgroundColor3 = Color3.fromRGB(14, 14, 18)
 Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
 Main.Parent = ScreenGui
 
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 11)
-local stroke = Instance.new("UIStroke", Main)
-stroke.Color = Color3.fromRGB(50, 50, 60)
-stroke.Thickness = 1.4
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 12)
+local mainStroke = Instance.new("UIStroke", Main)
+mainStroke.Color = Color3.fromRGB(55, 55, 70)
+mainStroke.Thickness = 1.3
 
-local Title = Instance.new("TextLabel", Main)
-Title.Size = UDim2.new(1, 0, 0, 38)
+-- Верхняя панель
+local TopBar = Instance.new("Frame", Main)
+TopBar.Size = UDim2.new(1, 0, 0, 38)
+TopBar.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+TopBar.BorderSizePixel = 0
+
+local Title = Instance.new("TextLabel", TopBar)
+Title.Size = UDim2.new(1, -70, 1, 0)
+Title.Position = UDim2.new(0, 12, 0, 0)
 Title.BackgroundTransparency = 1
 Title.Text = "MM2 ESP"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 19
+Title.TextSize = 17
 Title.TextColor3 = Color3.fromRGB(240, 240, 250)
+Title.TextXAlignment = Enum.TextXAlignment.Left
 
-local function CreateButton(name, y, text)
-    local btn = Instance.new("TextButton", Main)
+-- Кнопка минус
+local MinBtn = Instance.new("TextButton", TopBar)
+MinBtn.Size = UDim2.new(0, 28, 0, 28)
+MinBtn.Position = UDim2.new(1, -62, 0.5, -14)
+MinBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+MinBtn.Text = "−"
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextSize = 20
+MinBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 6)
+
+-- Кнопка крестик
+local CloseBtn = Instance.new("TextButton", TopBar)
+CloseBtn.Size = UDim2.new(0, 28, 0, 28)
+CloseBtn.Position = UDim2.new(1, -30, 0.5, -14)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+CloseBtn.Text = "×"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 20
+CloseBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+
+-- Контейнер кнопок
+local Container = Instance.new("Frame", Main)
+Container.Size = UDim2.new(1, 0, 1, -70)
+Container.Position = UDim2.new(0, 0, 0, 38)
+Container.BackgroundTransparency = 1
+
+local function CreateBtn(name, y, text)
+    local btn = Instance.new("TextButton", Container)
     btn.Name = name
-    btn.Size = UDim2.new(1, -24, 0, 36)
+    btn.Size = UDim2.new(1, -24, 0, 34)
     btn.Position = UDim2.new(0, 12, 0, y)
-    btn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
     btn.Text = text
     btn.Font = Enum.Font.GothamMedium
-    btn.TextSize = 14
+    btn.TextSize = 13
     btn.TextColor3 = Color3.fromRGB(225, 225, 235)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     return btn
 end
 
-local ESPBtn     = CreateButton("ESP", 48, "ESP: ВЫКЛ")
-local TracerBtn  = CreateButton("Tracers", 92, "Трейсеры: ВЫКЛ")
-local BoxBtn     = CreateButton("Box", 136, "Box ESP: ВЫКЛ")
-local GunBtn     = CreateButton("Gun", 180, "Gun ESP: ВЫКЛ")
-local KeybindBtn = CreateButton("Keybind", 224, "Keybind: Insert")
+local ESPBtn       = CreateBtn("ESP", 8, "ESP: ВЫКЛ")
+local TracerBtn    = CreateBtn("Tracers", 48, "Трейсеры + Стрелки: ВЫКЛ")
+local BoxBtn       = CreateBtn("Box", 88, "Box ESP: ВЫКЛ")
+local SkeletonBtn  = CreateBtn("Skeleton", 128, "Skeleton ESP: ВЫКЛ")
+local RainbowBtn   = CreateBtn("Rainbow", 168, "Rainbow ESP: ВЫКЛ")
+local GunBtn       = CreateBtn("Gun", 208, "Gun ESP: ВЫКЛ")
+local KeybindBtn   = CreateBtn("Keybind", 248, "Keybind: Insert")
 
--- Перетаскивание меню
-local dragging, dragStart, startPos
-Main.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = Main.Position
+-- Толщина
+local ThickLabel = Instance.new("TextLabel", Container)
+ThickLabel.Size = UDim2.new(1, -24, 0, 22)
+ThickLabel.Position = UDim2.new(0, 12, 0, 292)
+ThickLabel.BackgroundTransparency = 1
+ThickLabel.Text = "Толщина линий: 1.5"
+ThickLabel.Font = Enum.Font.Gotham
+ThickLabel.TextSize = 12
+ThickLabel.TextColor3 = Color3.fromRGB(170, 170, 185)
+ThickLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local ThickMinus = Instance.new("TextButton", Container)
+ThickMinus.Size = UDim2.new(0, 40, 0, 26)
+ThickMinus.Position = UDim2.new(0, 12, 0, 316)
+ThickMinus.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+ThickMinus.Text = "−"
+ThickMinus.Font = Enum.Font.GothamBold
+ThickMinus.TextSize = 16
+ThickMinus.TextColor3 = Color3.fromRGB(220, 220, 230)
+Instance.new("UICorner", ThickMinus).CornerRadius = UDim.new(0, 6)
+
+local ThickPlus = Instance.new("TextButton", Container)
+ThickPlus.Size = UDim2.new(0, 40, 0, 26)
+ThickPlus.Position = UDim2.new(0, 58, 0, 316)
+ThickPlus.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+ThickPlus.Text = "+"
+ThickPlus.Font = Enum.Font.GothamBold
+ThickPlus.TextSize = 16
+ThickPlus.TextColor3 = Color3.fromRGB(220, 220, 230)
+Instance.new("UICorner", ThickPlus).CornerRadius = UDim.new(0, 6)
+
+-- Нижняя полоска для перетаскивания
+local DragBar = Instance.new("Frame", Main)
+DragBar.Size = UDim2.new(0.5, 0, 0, 5)
+DragBar.Position = UDim2.new(0.25, 0, 1, -10)
+DragBar.BackgroundColor3 = Color3.fromRGB(80, 80, 100)
+DragBar.BorderSizePixel = 0
+Instance.new("UICorner", DragBar).CornerRadius = UDim.new(1, 0)
+
+-- Свёрнутая полоска сверху
+local MiniBar = Instance.new("TextButton")
+MiniBar.Name = "MiniBar"
+MiniBar.Size = UDim2.new(0, 140, 0, 22)
+MiniBar.Position = UDim2.new(0.5, -70, 0, 6)
+MiniBar.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+MiniBar.BackgroundTransparency = 0.35
+MiniBar.Text = "MM2 ESP"
+MiniBar.Font = Enum.Font.GothamMedium
+MiniBar.TextSize = 12
+MiniBar.TextColor3 = Color3.fromRGB(200, 200, 210)
+MiniBar.Visible = false
+MiniBar.Parent = ScreenGui
+Instance.new("UICorner", MiniBar).CornerRadius = UDim.new(0, 8)
+local miniStroke = Instance.new("UIStroke", MiniBar)
+miniStroke.Color = Color3.fromRGB(60, 60, 75)
+miniStroke.Thickness = 1
+miniStroke.Transparency = 0.4
+
+-- Кружок (минимум)
+local CircleBtn = Instance.new("TextButton")
+CircleBtn.Name = "Circle"
+CircleBtn.Size = UDim2.new(0, 44, 0, 44)
+CircleBtn.Position = UDim2.new(0, 30, 0.4, 0)
+CircleBtn.BackgroundColor3 = Color3.fromRGB(25, 25, 32)
+CircleBtn.Text = "ESP"
+CircleBtn.Font = Enum.Font.GothamBold
+CircleBtn.TextSize = 11
+CircleBtn.TextColor3 = Color3.fromRGB(220, 220, 230)
+CircleBtn.Visible = false
+CircleBtn.Parent = ScreenGui
+Instance.new("UICorner", CircleBtn).CornerRadius = UDim.new(1, 0)
+local circStroke = Instance.new("UIStroke", CircleBtn)
+circStroke.Color = Color3.fromRGB(70, 70, 90)
+circStroke.Thickness = 1.5
+
+-- ================= ПЕРЕМЕЩЕНИЕ С ЭФФЕКТОМ =================
+local dragging = false
+local dragInput, dragStart, startPos
+local holdStart = 0
+local isReadyToDrag = false
+local originalSize = Main.Size
+
+local function StartHold()
+    holdStart = tick()
+    isReadyToDrag = false
+    task.spawn(function()
+        task.wait(0.5)
+        if holdStart ~= 0 then
+            isReadyToDrag = true
+            -- Эффект втягивания
+            TweenService:Create(Main, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(0, 210, 0, 380)
+            }):Play()
+            TweenService:Create(mainStroke, TweenInfo.new(0.22), {Color = Color3.fromRGB(100, 140, 255)}):Play()
+        end
+    end)
+end
+
+local function StopHold()
+    holdStart = 0
+    if isReadyToDrag then
+        TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Size = originalSize
+        }):Play()
+        TweenService:Create(mainStroke, TweenInfo.new(0.25), {Color = Color3.fromRGB(55, 55, 70)}):Play()
     end
-end)
-Main.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
+    isReadyToDrag = false
+    dragging = false
+end
+
+local function SetupDrag(frame)
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            StartHold()
+            dragStart = input.Position
+            startPos = Main.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    StopHold()
+                end
+            end)
+        end
+    end)
+
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+end
+
+SetupDrag(TopBar)
+SetupDrag(DragBar)
+
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if (input == dragInput) and isReadyToDrag then
         local delta = input.Position - dragStart
         Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- ========== ФУНКЦИИ ==========
+-- Перетаскивание кружка и мини-бара
+local function MakeDraggable(obj)
+    local d, ds, sp
+    obj.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            d = true
+            ds = input.Position
+            sp = obj.Position
+        end
+    end)
+    obj.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            d = false
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if d and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - ds
+            obj.Position = UDim2.new(sp.X.Scale, sp.X.Offset + delta.X, sp.Y.Scale, sp.Y.Offset + delta.Y)
+        end
+    end)
+end
+MakeDraggable(CircleBtn)
+MakeDraggable(MiniBar)
+
+-- ================= ФУНКЦИИ ESP =================
 local function GetRole(player)
     local char = player.Character
     if not char then return "Dead" end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return "Dead" end
-
     local bp = player:FindFirstChild("Backpack")
     local hasKnife = char:FindFirstChild("Knife") or (bp and bp:FindFirstChild("Knife"))
     local hasGun   = char:FindFirstChild("Gun")   or (bp and bp:FindFirstChild("Gun"))
-
     if hasKnife then return "Murderer"
     elseif hasGun then return "Sheriff"
     else return "Innocent" end
@@ -124,24 +313,21 @@ local function CreateHighlight(adornee, color)
     return h
 end
 
-local function CreateBillboard(player)
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "ESPInfo"
-    bb.Size = UDim2.new(0, 200, 0, 50)
-    bb.StudsOffset = Vector3.new(0, 3.2, 0)
-    bb.AlwaysOnTop = true
-    bb.MaxDistance = 1000
+local function NewLine()
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Thickness = LineThickness
+    line.Transparency = 0.8
+    return line
+end
 
-    local label = Instance.new("TextLabel", bb)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Font = Enum.Font.GothamBold
-    label.TextSize = 14
-    label.TextStrokeTransparency = 0.4
-    label.TextColor3 = Color3.new(1, 1, 1)
-    label.Text = ""
-
-    return bb, label
+local function NewTriangle()
+    local t = Drawing.new("Triangle")
+    t.Visible = false
+    t.Filled = true
+    t.Thickness = 1
+    t.Transparency = 0.3
+    return t
 end
 
 local function ClearPlayer(player)
@@ -150,34 +336,28 @@ local function ClearPlayer(player)
     if data.highlight then data.highlight:Destroy() end
     if data.billboard then data.billboard:Destroy() end
     if data.tracer then data.tracer:Remove() end
-    if data.box then
-        for _, line in pairs(data.box) do line:Remove() end
-    end
+    if data.arrow then data.arrow:Remove() end
+    if data.box then for _, l in pairs(data.box) do l:Remove() end end
+    if data.skeleton then for _, l in pairs(data.skeleton) do l:Remove() end end
     PlayerData[player] = nil
 end
 
 local function ClearAllPlayers()
-    for player in pairs(PlayerData) do
-        ClearPlayer(player)
-    end
+    for p in pairs(PlayerData) do ClearPlayer(p) end
 end
 
 local function ClearGuns()
-    for obj, h in pairs(GunHighlights) do
-        if h then h:Destroy() end
-    end
+    for obj, h in pairs(GunHighlights) do if h then h:Destroy() end end
     table.clear(GunHighlights)
 end
 
-local function NewLine()
-    local line = Drawing.new("Line")
-    line.Visible = false
-    line.Thickness = 1.5
-    line.Transparency = 0.85
-    return line
+local function GetRainbowColor()
+    return Color3.fromHSV(RainbowHue, 0.9, 1)
 end
 
 local function UpdateESP()
+    RainbowHue = (RainbowHue + 0.005) % 1
+
     for _, player in ipairs(Players:GetPlayers()) do
         if player == LocalPlayer then continue end
 
@@ -191,7 +371,8 @@ local function UpdateESP()
         end
 
         local role = GetRole(player)
-        local color = Colors[role]
+        local baseColor = Colors[role]
+        local color = RainbowEnabled and GetRainbowColor() or baseColor
         local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local dist = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 0
 
@@ -201,11 +382,13 @@ local function UpdateESP()
                 billboard = nil,
                 label = nil,
                 tracer = NewLine(),
-                box = {
-                    top = NewLine(), bottom = NewLine(),
-                    left = NewLine(), right = NewLine()
-                }
+                arrow = NewTriangle(),
+                box = {top = NewLine(), bottom = NewLine(), left = NewLine(), right = NewLine()},
+                skeleton = {}
             }
+            for i = 1, 12 do
+                PlayerData[player].skeleton[i] = NewLine()
+            end
         end
         local data = PlayerData[player]
 
@@ -225,34 +408,63 @@ local function UpdateESP()
         -- Имя + Роль + Дистанция
         if ESPEnabled then
             if not data.billboard or not data.billboard.Parent then
-                local bb, label = CreateBillboard(player)
+                local bb = Instance.new("BillboardGui")
+                bb.Size = UDim2.new(0, 200, 0, 48)
+                bb.StudsOffset = Vector3.new(0, 3.3, 0)
+                bb.AlwaysOnTop = true
+                bb.MaxDistance = 1200
                 bb.Adornee = root
                 bb.Parent = char
+                local label = Instance.new("TextLabel", bb)
+                label.Size = UDim2.new(1, 0, 1, 0)
+                label.BackgroundTransparency = 1
+                label.Font = Enum.Font.GothamBold
+                label.TextSize = 13
+                label.TextStrokeTransparency = 0.35
                 data.billboard = bb
                 data.label = label
             end
-            data.label.Text = string.format("%s\n[%s]  %dm", player.Name, role, dist)
+            data.label.Text = string.format("%s\n[%s] %dm", player.Name, role, dist)
             data.label.TextColor3 = color
         elseif data.billboard then
             data.billboard:Destroy()
             data.billboard = nil
-            data.label = nil
         end
 
-        -- Трейсеры
+        local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local screenVec = Vector2.new(screenPos.X, screenPos.Y)
+
+        -- Трейсеры + Стрелки
         if TracersEnabled and ESPEnabled then
-            local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-            data.tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-            data.tracer.To = Vector2.new(screenPos.X, screenPos.Y)
-            data.tracer.Color = color
-            data.tracer.Visible = onScreen
+            data.tracer.Thickness = LineThickness
+            if onScreen then
+                data.tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                data.tracer.To = screenVec
+                data.tracer.Color = color
+                data.tracer.Visible = true
+                data.arrow.Visible = false
+            else
+                -- Стрелка за экраном
+                data.tracer.Visible = false
+                local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                local dir = (screenVec - center).Unit
+                local edge = center + dir * (math.min(Camera.ViewportSize.X, Camera.ViewportSize.Y) * 0.42)
+                local angle = math.atan2(dir.Y, dir.X)
+                local size = 11
+                data.arrow.PointA = edge
+                data.arrow.PointB = edge + Vector2.new(math.cos(angle + 2.4)*size, math.sin(angle + 2.4)*size)
+                data.arrow.PointC = edge + Vector2.new(math.cos(angle - 2.4)*size, math.sin(angle - 2.4)*size)
+                data.arrow.Color = color
+                data.arrow.Visible = true
+            end
         else
             data.tracer.Visible = false
+            data.arrow.Visible = false
         end
 
         -- Box ESP
-        if BoxEnabled and ESPEnabled then
-            local size = Vector3.new(3, 5.5, 3)
+        if BoxEnabled and ESPEnabled and onScreen then
+            local size = Vector3.new(2.8, 5.4, 2.8)
             local cf = root.CFrame
             local corners = {
                 cf * CFrame.new(-size.X/2,  size.Y/2, 0),
@@ -260,36 +472,83 @@ local function UpdateESP()
                 cf * CFrame.new(-size.X/2, -size.Y/2, 0),
                 cf * CFrame.new( size.X/2, -size.Y/2, 0)
             }
-            local screen = {}
-            local allOnScreen = true
-            for i, corner in ipairs(corners) do
-                local sp, on = Camera:WorldToViewportPoint(corner.Position)
-                screen[i] = Vector2.new(sp.X, sp.Y)
-                if not on then allOnScreen = false end
+            local sc = {}
+            local ok = true
+            for i, c in ipairs(corners) do
+                local sp, on = Camera:WorldToViewportPoint(c.Position)
+                sc[i] = Vector2.new(sp.X, sp.Y)
+                if not on then ok = false end
             end
-            if allOnScreen then
-                data.box.top.From = screen[1];    data.box.top.To = screen[2]
-                data.box.bottom.From = screen[3]; data.box.bottom.To = screen[4]
-                data.box.left.From = screen[1];   data.box.left.To = screen[3]
-                data.box.right.From = screen[2];  data.box.right.To = screen[4]
-                for _, line in pairs(data.box) do
-                    line.Color = color
-                    line.Visible = true
+            if ok then
+                data.box.top.From = sc[1]; data.box.top.To = sc[2]
+                data.box.bottom.From = sc[3]; data.box.bottom.To = sc[4]
+                data.box.left.From = sc[1]; data.box.left.To = sc[3]
+                data.box.right.From = sc[2]; data.box.right.To = sc[4]
+                for _, l in pairs(data.box) do
+                    l.Color = color
+                    l.Thickness = LineThickness
+                    l.Visible = true
                 end
             else
-                for _, line in pairs(data.box) do line.Visible = false end
+                for _, l in pairs(data.box) do l.Visible = false end
             end
         else
-            for _, line in pairs(data.box) do line.Visible = false end
+            for _, l in pairs(data.box) do l.Visible = false end
+        end
+
+        -- Skeleton ESP
+        if SkeletonEnabled and ESPEnabled then
+            local function getPos(partName)
+                local p = char:FindFirstChild(partName)
+                if p then
+                    local sp, on = Camera:WorldToViewportPoint(p.Position)
+                    return on and Vector2.new(sp.X, sp.Y) or nil
+                end
+                return nil
+            end
+
+            local head = getPos("Head")
+            local torso = getPos("UpperTorso") or getPos("Torso")
+            local leftArm = getPos("LeftUpperArm") or getPos("Left Arm")
+            local rightArm = getPos("RightUpperArm") or getPos("Right Arm")
+            local leftLeg = getPos("LeftUpperLeg") or getPos("Left Leg")
+            local rightLeg = getPos("RightUpperLeg") or getPos("Right Leg")
+            local leftHand = getPos("LeftHand") or getPos("Left Arm")
+            local rightHand = getPos("RightHand") or getPos("Right Arm")
+            local leftFoot = getPos("LeftFoot") or getPos("Left Leg")
+            local rightFoot = getPos("RightFoot") or getPos("Right Leg")
+
+            local connections = {
+                {head, torso},
+                {torso, leftArm}, {leftArm, leftHand},
+                {torso, rightArm}, {rightArm, rightHand},
+                {torso, leftLeg}, {leftLeg, leftFoot},
+                {torso, rightLeg}, {rightLeg, rightFoot}
+            }
+
+            for i, conn in ipairs(connections) do
+                local line = data.skeleton[i]
+                if conn[1] and conn[2] then
+                    line.From = conn[1]
+                    line.To = conn[2]
+                    line.Color = color
+                    line.Thickness = LineThickness
+                    line.Visible = true
+                else
+                    line.Visible = false
+                end
+            end
+            for i = #connections + 1, 12 do
+                data.skeleton[i].Visible = false
+            end
+        else
+            for _, l in pairs(data.skeleton) do l.Visible = false end
         end
     end
 end
 
 local function UpdateGunESP()
-    if not GunESPEnabled then
-        ClearGuns()
-        return
-    end
+    if not GunESPEnabled then ClearGuns() return end
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj.Name == "Gun" and (obj:IsA("Tool") or obj:IsA("Model")) then
             if not GunHighlights[obj] then
@@ -305,79 +564,119 @@ local function UpdateGunESP()
     end
 end
 
--- ========== КНОПКИ ==========
-local function SetButtonState(btn, state, onText, offText)
-    if state then
-        btn.Text = onText
-        btn.BackgroundColor3 = Color3.fromRGB(35, 85, 50)
-    else
-        btn.Text = offText
-        btn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
-    end
+-- ================= КНОПКИ =================
+local function SetState(btn, state, onT, offT)
+    btn.Text = state and onT or offT
+    btn.BackgroundColor3 = state and Color3.fromRGB(35, 85, 50) or Color3.fromRGB(30, 30, 38)
 end
 
 ESPBtn.MouseButton1Click:Connect(function()
     ESPEnabled = not ESPEnabled
-    SetButtonState(ESPBtn, ESPEnabled, "ESP: ВКЛ", "ESP: ВЫКЛ")
+    SetState(ESPBtn, ESPEnabled, "ESP: ВКЛ", "ESP: ВЫКЛ")
     if not ESPEnabled then
         ClearAllPlayers()
         TracersEnabled = false
         BoxEnabled = false
-        SetButtonState(TracerBtn, false, "Трейсеры: ВКЛ", "Трейсеры: ВЫКЛ")
-        SetButtonState(BoxBtn, false, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+        SkeletonEnabled = false
+        SetState(TracerBtn, false, "Трейсеры + Стрелки: ВКЛ", "Трейсеры + Стрелки: ВЫКЛ")
+        SetState(BoxBtn, false, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+        SetState(SkeletonBtn, false, "Skeleton ESP: ВКЛ", "Skeleton ESP: ВЫКЛ")
     end
 end)
 
 TracerBtn.MouseButton1Click:Connect(function()
     if not ESPEnabled then return end
     TracersEnabled = not TracersEnabled
-    SetButtonState(TracerBtn, TracersEnabled, "Трейсеры: ВКЛ", "Трейсеры: ВЫКЛ")
+    SetState(TracerBtn, TracersEnabled, "Трейсеры + Стрелки: ВКЛ", "Трейсеры + Стрелки: ВЫКЛ")
 end)
 
 BoxBtn.MouseButton1Click:Connect(function()
     if not ESPEnabled then return end
     BoxEnabled = not BoxEnabled
-    SetButtonState(BoxBtn, BoxEnabled, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+    SetState(BoxBtn, BoxEnabled, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+end)
+
+SkeletonBtn.MouseButton1Click:Connect(function()
+    if not ESPEnabled then return end
+    SkeletonEnabled = not SkeletonEnabled
+    SetState(SkeletonBtn, SkeletonEnabled, "Skeleton ESP: ВКЛ", "Skeleton ESP: ВЫКЛ")
+end)
+
+RainbowBtn.MouseButton1Click:Connect(function()
+    RainbowEnabled = not RainbowEnabled
+    SetState(RainbowBtn, RainbowEnabled, "Rainbow ESP: ВКЛ", "Rainbow ESP: ВЫКЛ")
 end)
 
 GunBtn.MouseButton1Click:Connect(function()
     GunESPEnabled = not GunESPEnabled
-    SetButtonState(GunBtn, GunESPEnabled, "Gun ESP: ВКЛ", "Gun ESP: ВЫКЛ")
+    SetState(GunBtn, GunESPEnabled, "Gun ESP: ВКЛ", "Gun ESP: ВЫКЛ")
     if not GunESPEnabled then ClearGuns() end
 end)
 
--- ===== ВЫБОР КЛАВИШИ =====
+-- Толщина
+ThickMinus.MouseButton1Click:Connect(function()
+    LineThickness = math.clamp(LineThickness - 0.5, 0.5, 5)
+    ThickLabel.Text = "Толщина линий: " .. string.format("%.1f", LineThickness)
+end)
+ThickPlus.MouseButton1Click:Connect(function()
+    LineThickness = math.clamp(LineThickness + 0.5, 0.5, 5)
+    ThickLabel.Text = "Толщина линий: " .. string.format("%.1f", LineThickness)
+end)
+
+-- Keybind
 KeybindBtn.MouseButton1Click:Connect(function()
     if WaitingForKey then return end
     WaitingForKey = true
     KeybindBtn.Text = "Нажми любую клавишу..."
-    KeybindBtn.BackgroundColor3 = Color3.fromRGB(80, 60, 30)
+    KeybindBtn.BackgroundColor3 = Color3.fromRGB(90, 70, 30)
 end)
 
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-
-    -- Установка новой клавиши
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
     if WaitingForKey and input.UserInputType == Enum.UserInputType.Keyboard then
         Keybind = input.KeyCode
         KeybindBtn.Text = "Keybind: " .. input.KeyCode.Name
-        KeybindBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+        KeybindBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
         WaitingForKey = false
         return
     end
-
-    -- Срабатывание кейбинда
     if not WaitingForKey and input.KeyCode == Keybind then
         ESPEnabled = not ESPEnabled
-        SetButtonState(ESPBtn, ESPEnabled, "ESP: ВКЛ", "ESP: ВЫКЛ")
+        SetState(ESPBtn, ESPEnabled, "ESP: ВКЛ", "ESP: ВЫКЛ")
         if not ESPEnabled then
             ClearAllPlayers()
             TracersEnabled = false
             BoxEnabled = false
-            SetButtonState(TracerBtn, false, "Трейсеры: ВКЛ", "Трейсеры: ВЫКЛ")
-            SetButtonState(BoxBtn, false, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+            SkeletonEnabled = false
+            SetState(TracerBtn, false, "Трейсеры + Стрелки: ВКЛ", "Трейсеры + Стрелки: ВЫКЛ")
+            SetState(BoxBtn, false, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+            SetState(SkeletonBtn, false, "Skeleton ESP: ВКЛ", "Skeleton ESP: ВЫКЛ")
         end
     end
+end)
+
+-- Крестик → мини-бар сверху
+CloseBtn.MouseButton1Click:Connect(function()
+    Main.Visible = false
+    CircleBtn.Visible = false
+    MiniBar.Visible = true
+end)
+
+MiniBar.MouseButton1Click:Connect(function()
+    MiniBar.Visible = false
+    Main.Visible = true
+end)
+
+-- Минус → кружок
+MinBtn.MouseButton1Click:Connect(function()
+    Main.Visible = false
+    MiniBar.Visible = false
+    CircleBtn.Visible = true
+end)
+
+CircleBtn.MouseButton1Click:Connect(function()
+    CircleBtn.Visible = false
+    Main.Visible = true
 end)
 
 Players.PlayerRemoving:Connect(ClearPlayer)
@@ -387,4 +686,4 @@ RunService.RenderStepped:Connect(function()
     if GunESPEnabled then UpdateGunESP() end
 end)
 
-print("[MM2 ESP] Загружено | Нажми на Keybind чтобы сменить клавишу")
+print("[MM2 ESP] Полная версия загружена")
