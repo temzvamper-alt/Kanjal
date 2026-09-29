@@ -1,2 +1,0 @@
-# Kanjal
-kanjal

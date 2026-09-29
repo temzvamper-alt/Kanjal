@@ -1,0 +1,279 @@
+-- Murder Mystery 2 ESP + Gun ESP
+-- Тёмное меню + 2 кнопки
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- Настройки
+local ESPEnabled = false
+local GunESPEnabled = false
+
+local Colors = {
+    Murderer = Color3.fromRGB(255, 50, 50),      -- Красный
+    Sheriff  = Color3.fromRGB(50, 120, 255),     -- Синий
+    Innocent = Color3.fromRGB(50, 255, 100),     -- Зелёный
+    Dead     = Color3.fromRGB(130, 130, 130),    -- Серый
+    Gun      = Color3.fromRGB(255, 200, 50)      -- Жёлтый для пушки
+}
+
+-- Хранилище ESP объектов
+local PlayerHighlights = {}
+local GunHighlights = {}
+
+-- ==================== GUI ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MM2ESPMenu"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "Main"
+MainFrame.Size = UDim2.new(0, 220, 0, 160)
+MainFrame.Position = UDim2.new(0, 20, 0.5, -80)
+MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 10)
+UICorner.Parent = MainFrame
+
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(45, 45, 55)
+UIStroke.Thickness = 1.5
+UIStroke.Parent = MainFrame
+
+-- Заголовок
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 36)
+Title.BackgroundTransparency = 1
+Title.Text = "MM2 ESP"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextColor3 = Color3.fromRGB(240, 240, 245)
+Title.Parent = MainFrame
+
+-- Кнопка ESP
+local ESPButton = Instance.new("TextButton")
+ESPButton.Name = "ESPToggle"
+ESPButton.Size = UDim2.new(1, -24, 0, 38)
+ESPButton.Position = UDim2.new(0, 12, 0, 48)
+ESPButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+ESPButton.Text = "ESP: ВЫКЛ"
+ESPButton.Font = Enum.Font.GothamMedium
+ESPButton.TextSize = 15
+ESPButton.TextColor3 = Color3.fromRGB(220, 220, 230)
+ESPButton.Parent = MainFrame
+
+local ESPCorner = Instance.new("UICorner")
+ESPCorner.CornerRadius = UDim.new(0, 8)
+ESPCorner.Parent = ESPButton
+
+-- Кнопка Gun ESP
+local GunButton = Instance.new("TextButton")
+GunButton.Name = "GunToggle"
+GunButton.Size = UDim2.new(1, -24, 0, 38)
+GunButton.Position = UDim2.new(0, 12, 0, 96)
+GunButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+GunButton.Text = "Gun ESP: ВЫКЛ"
+GunButton.Font = Enum.Font.GothamMedium
+GunButton.TextSize = 15
+GunButton.TextColor3 = Color3.fromRGB(220, 220, 230)
+GunButton.Parent = MainFrame
+
+local GunCorner = Instance.new("UICorner")
+GunCorner.CornerRadius = UDim.new(0, 8)
+GunCorner.Parent = GunButton
+
+-- Перетаскивание меню
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ==================== Функции ====================
+
+local function GetRole(player)
+    local char = player.Character
+    if not char then return "Dead" end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid or humanoid.Health <= 0 then
+        return "Dead"
+    end
+
+    -- Проверяем инструменты
+    local backpack = player:FindFirstChild("Backpack")
+    local hasKnife = char:FindFirstChild("Knife") or (backpack and backpack:FindFirstChild("Knife"))
+    local hasGun = char:FindFirstChild("Gun") or (backpack and backpack:FindFirstChild("Gun"))
+
+    if hasKnife then
+        return "Murderer"
+    elseif hasGun then
+        return "Sheriff"
+    else
+        return "Innocent"
+    end
+end
+
+local function CreateHighlight(adornee, color, fillTransparency)
+    local highlight = Instance.new("Highlight")
+    highlight.Adornee = adornee
+    highlight.FillColor = color
+    highlight.OutlineColor = color
+    highlight.FillTransparency = fillTransparency or 0.55
+    highlight.OutlineTransparency = 0.2
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = adornee
+    return highlight
+end
+
+local function ClearPlayerESP()
+    for _, hl in pairs(PlayerHighlights) do
+        if hl and hl.Parent then
+            hl:Destroy()
+        end
+    end
+    table.clear(PlayerHighlights)
+end
+
+local function ClearGunESP()
+    for _, hl in pairs(GunHighlights) do
+        if hl and hl.Parent then
+            hl:Destroy()
+        end
+    end
+    table.clear(GunHighlights)
+end
+
+local function UpdatePlayerESP()
+    if not ESPEnabled then
+        ClearPlayerESP()
+        return
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local char = player.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                local role = GetRole(player)
+                local color = Colors[role] or Colors.Innocent
+
+                local existing = PlayerHighlights[player]
+                if existing and existing.Parent then
+                    existing.FillColor = color
+                    existing.OutlineColor = color
+                else
+                    if existing then existing:Destroy() end
+                    PlayerHighlights[player] = CreateHighlight(char, color, 0.5)
+                end
+            else
+                if PlayerHighlights[player] then
+                    PlayerHighlights[player]:Destroy()
+                    PlayerHighlights[player] = nil
+                end
+            end
+        end
+    end
+end
+
+local function UpdateGunESP()
+    if not GunESPEnabled then
+        ClearGunESP()
+        return
+    end
+
+    -- Ищем пушки в мире и у игроков
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj.Name == "Gun" and (obj:IsA("Tool") or obj:IsA("Model") or obj:IsA("BasePart")) then
+            if not GunHighlights[obj] then
+                local target = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+                if target then
+                    GunHighlights[obj] = CreateHighlight(obj:IsA("Model") and obj or target, Colors.Gun, 0.4)
+                end
+            end
+        end
+    end
+
+    -- Чистим уничтоженные
+    for obj, hl in pairs(GunHighlights) do
+        if not obj or not obj.Parent then
+            if hl then hl:Destroy() end
+            GunHighlights[obj] = nil
+        end
+    end
+end
+
+-- Кнопки
+ESPButton.MouseButton1Click:Connect(function()
+    ESPEnabled = not ESPEnabled
+    if ESPEnabled then
+        ESPButton.Text = "ESP: ВКЛ"
+        ESPButton.BackgroundColor3 = Color3.fromRGB(40, 90, 50)
+    else
+        ESPButton.Text = "ESP: ВЫКЛ"
+        ESPButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+        ClearPlayerESP()
+    end
+end)
+
+GunButton.MouseButton1Click:Connect(function()
+    GunESPEnabled = not GunESPEnabled
+    if GunESPEnabled then
+        GunButton.Text = "Gun ESP: ВКЛ"
+        GunButton.BackgroundColor3 = Color3.fromRGB(40, 90, 50)
+    else
+        GunButton.Text = "Gun ESP: ВЫКЛ"
+        GunButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+        ClearGunESP()
+    end
+end)
+
+-- Основной цикл
+RunService.Heartbeat:Connect(function()
+    if ESPEnabled then
+        UpdatePlayerESP()
+    end
+    if GunESPEnabled then
+        UpdateGunESP()
+    end
+end)
+
+-- Очистка при выходе игроков
+Players.PlayerRemoving:Connect(function(player)
+    if PlayerHighlights[player] then
+        PlayerHighlights[player]:Destroy()
+        PlayerHighlights[player] = nil
+    end
+end)
+
+print("[MM2 ESP] Загружено успешно")
