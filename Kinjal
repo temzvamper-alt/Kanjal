@@ -1,279 +1,390 @@
--- Murder Mystery 2 ESP + Gun ESP
--- Тёмное меню + 2 кнопки
+-- Murder Mystery 2 ESP
+-- Имя + Роль + Дистанция | Трейсеры | Box ESP | Gun ESP | Свой Keybind
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
 local CoreGui = game:GetService("CoreGui")
-
-local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Настройки
+local LocalPlayer = Players.LocalPlayer
+
+-- ========== НАСТРОЙКИ ==========
 local ESPEnabled = false
+local TracersEnabled = false
+local BoxEnabled = false
 local GunESPEnabled = false
+local Keybind = Enum.KeyCode.Insert
+local WaitingForKey = false
 
 local Colors = {
-    Murderer = Color3.fromRGB(255, 50, 50),      -- Красный
-    Sheriff  = Color3.fromRGB(50, 120, 255),     -- Синий
-    Innocent = Color3.fromRGB(50, 255, 100),     -- Зелёный
-    Dead     = Color3.fromRGB(130, 130, 130),    -- Серый
-    Gun      = Color3.fromRGB(255, 200, 50)      -- Жёлтый для пушки
+    Murderer = Color3.fromRGB(255, 50, 50),
+    Sheriff  = Color3.fromRGB(50, 130, 255),
+    Innocent = Color3.fromRGB(50, 255, 110),
+    Dead     = Color3.fromRGB(140, 140, 140),
+    Gun      = Color3.fromRGB(255, 210, 50)
 }
 
--- Хранилище ESP объектов
-local PlayerHighlights = {}
+local PlayerData = {}
 local GunHighlights = {}
 
--- ==================== GUI ====================
+-- ========== GUI ==========
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "MM2ESPMenu"
+ScreenGui.Name = "MM2ESP"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = CoreGui
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "Main"
-MainFrame.Size = UDim2.new(0, 220, 0, 160)
-MainFrame.Position = UDim2.new(0, 20, 0.5, -80)
-MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-MainFrame.BorderSizePixel = 0
-MainFrame.Parent = ScreenGui
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 230, 0, 300)
+Main.Position = UDim2.new(0, 20, 0.35, 0)
+Main.BackgroundColor3 = Color3.fromRGB(16, 16, 20)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 10)
-UICorner.Parent = MainFrame
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 11)
+local stroke = Instance.new("UIStroke", Main)
+stroke.Color = Color3.fromRGB(50, 50, 60)
+stroke.Thickness = 1.4
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(45, 45, 55)
-UIStroke.Thickness = 1.5
-UIStroke.Parent = MainFrame
-
--- Заголовок
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 36)
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, 0, 0, 38)
 Title.BackgroundTransparency = 1
 Title.Text = "MM2 ESP"
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 18
-Title.TextColor3 = Color3.fromRGB(240, 240, 245)
-Title.Parent = MainFrame
+Title.TextSize = 19
+Title.TextColor3 = Color3.fromRGB(240, 240, 250)
 
--- Кнопка ESP
-local ESPButton = Instance.new("TextButton")
-ESPButton.Name = "ESPToggle"
-ESPButton.Size = UDim2.new(1, -24, 0, 38)
-ESPButton.Position = UDim2.new(0, 12, 0, 48)
-ESPButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-ESPButton.Text = "ESP: ВЫКЛ"
-ESPButton.Font = Enum.Font.GothamMedium
-ESPButton.TextSize = 15
-ESPButton.TextColor3 = Color3.fromRGB(220, 220, 230)
-ESPButton.Parent = MainFrame
+local function CreateButton(name, y, text)
+    local btn = Instance.new("TextButton", Main)
+    btn.Name = name
+    btn.Size = UDim2.new(1, -24, 0, 36)
+    btn.Position = UDim2.new(0, 12, 0, y)
+    btn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+    btn.Text = text
+    btn.Font = Enum.Font.GothamMedium
+    btn.TextSize = 14
+    btn.TextColor3 = Color3.fromRGB(225, 225, 235)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
 
-local ESPCorner = Instance.new("UICorner")
-ESPCorner.CornerRadius = UDim.new(0, 8)
-ESPCorner.Parent = ESPButton
-
--- Кнопка Gun ESP
-local GunButton = Instance.new("TextButton")
-GunButton.Name = "GunToggle"
-GunButton.Size = UDim2.new(1, -24, 0, 38)
-GunButton.Position = UDim2.new(0, 12, 0, 96)
-GunButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-GunButton.Text = "Gun ESP: ВЫКЛ"
-GunButton.Font = Enum.Font.GothamMedium
-GunButton.TextSize = 15
-GunButton.TextColor3 = Color3.fromRGB(220, 220, 230)
-GunButton.Parent = MainFrame
-
-local GunCorner = Instance.new("UICorner")
-GunCorner.CornerRadius = UDim.new(0, 8)
-GunCorner.Parent = GunButton
+local ESPBtn     = CreateButton("ESP", 48, "ESP: ВЫКЛ")
+local TracerBtn  = CreateButton("Tracers", 92, "Трейсеры: ВЫКЛ")
+local BoxBtn     = CreateButton("Box", 136, "Box ESP: ВЫКЛ")
+local GunBtn     = CreateButton("Gun", 180, "Gun ESP: ВЫКЛ")
+local KeybindBtn = CreateButton("Keybind", 224, "Keybind: Insert")
 
 -- Перетаскивание меню
-local dragging, dragInput, dragStart, startPos
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+local dragging, dragStart, startPos
+Main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
+        startPos = Main.Position
     end
 end)
-
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
+Main.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        Main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
     end
 end)
 
--- ==================== Функции ====================
-
+-- ========== ФУНКЦИИ ==========
 local function GetRole(player)
     local char = player.Character
     if not char then return "Dead" end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return "Dead" end
 
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid or humanoid.Health <= 0 then
-        return "Dead"
+    local bp = player:FindFirstChild("Backpack")
+    local hasKnife = char:FindFirstChild("Knife") or (bp and bp:FindFirstChild("Knife"))
+    local hasGun   = char:FindFirstChild("Gun")   or (bp and bp:FindFirstChild("Gun"))
+
+    if hasKnife then return "Murderer"
+    elseif hasGun then return "Sheriff"
+    else return "Innocent" end
+end
+
+local function CreateHighlight(adornee, color)
+    local h = Instance.new("Highlight")
+    h.Adornee = adornee
+    h.FillColor = color
+    h.OutlineColor = color
+    h.FillTransparency = 0.55
+    h.OutlineTransparency = 0.15
+    h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    h.Parent = adornee
+    return h
+end
+
+local function CreateBillboard(player)
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "ESPInfo"
+    bb.Size = UDim2.new(0, 200, 0, 50)
+    bb.StudsOffset = Vector3.new(0, 3.2, 0)
+    bb.AlwaysOnTop = true
+    bb.MaxDistance = 1000
+
+    local label = Instance.new("TextLabel", bb)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 14
+    label.TextStrokeTransparency = 0.4
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.Text = ""
+
+    return bb, label
+end
+
+local function ClearPlayer(player)
+    local data = PlayerData[player]
+    if not data then return end
+    if data.highlight then data.highlight:Destroy() end
+    if data.billboard then data.billboard:Destroy() end
+    if data.tracer then data.tracer:Remove() end
+    if data.box then
+        for _, line in pairs(data.box) do line:Remove() end
     end
+    PlayerData[player] = nil
+end
 
-    -- Проверяем инструменты
-    local backpack = player:FindFirstChild("Backpack")
-    local hasKnife = char:FindFirstChild("Knife") or (backpack and backpack:FindFirstChild("Knife"))
-    local hasGun = char:FindFirstChild("Gun") or (backpack and backpack:FindFirstChild("Gun"))
-
-    if hasKnife then
-        return "Murderer"
-    elseif hasGun then
-        return "Sheriff"
-    else
-        return "Innocent"
+local function ClearAllPlayers()
+    for player in pairs(PlayerData) do
+        ClearPlayer(player)
     end
 end
 
-local function CreateHighlight(adornee, color, fillTransparency)
-    local highlight = Instance.new("Highlight")
-    highlight.Adornee = adornee
-    highlight.FillColor = color
-    highlight.OutlineColor = color
-    highlight.FillTransparency = fillTransparency or 0.55
-    highlight.OutlineTransparency = 0.2
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = adornee
-    return highlight
-end
-
-local function ClearPlayerESP()
-    for _, hl in pairs(PlayerHighlights) do
-        if hl and hl.Parent then
-            hl:Destroy()
-        end
-    end
-    table.clear(PlayerHighlights)
-end
-
-local function ClearGunESP()
-    for _, hl in pairs(GunHighlights) do
-        if hl and hl.Parent then
-            hl:Destroy()
-        end
+local function ClearGuns()
+    for obj, h in pairs(GunHighlights) do
+        if h then h:Destroy() end
     end
     table.clear(GunHighlights)
 end
 
-local function UpdatePlayerESP()
-    if not ESPEnabled then
-        ClearPlayerESP()
-        return
-    end
+local function NewLine()
+    local line = Drawing.new("Line")
+    line.Visible = false
+    line.Thickness = 1.5
+    line.Transparency = 0.85
+    return line
+end
 
+local function UpdateESP()
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local char = player.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                local role = GetRole(player)
-                local color = Colors[role] or Colors.Innocent
+        if player == LocalPlayer then continue end
 
-                local existing = PlayerHighlights[player]
-                if existing and existing.Parent then
-                    existing.FillColor = color
-                    existing.OutlineColor = color
-                else
-                    if existing then existing:Destroy() end
-                    PlayerHighlights[player] = CreateHighlight(char, color, 0.5)
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if not root or not hum or hum.Health <= 0 then
+            ClearPlayer(player)
+            continue
+        end
+
+        local role = GetRole(player)
+        local color = Colors[role]
+        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local dist = myRoot and math.floor((root.Position - myRoot.Position).Magnitude) or 0
+
+        if not PlayerData[player] then
+            PlayerData[player] = {
+                highlight = nil,
+                billboard = nil,
+                label = nil,
+                tracer = NewLine(),
+                box = {
+                    top = NewLine(), bottom = NewLine(),
+                    left = NewLine(), right = NewLine()
+                }
+            }
+        end
+        local data = PlayerData[player]
+
+        -- Highlight
+        if ESPEnabled then
+            if not data.highlight or not data.highlight.Parent then
+                data.highlight = CreateHighlight(char, color)
+            else
+                data.highlight.FillColor = color
+                data.highlight.OutlineColor = color
+            end
+        elseif data.highlight then
+            data.highlight:Destroy()
+            data.highlight = nil
+        end
+
+        -- Имя + Роль + Дистанция
+        if ESPEnabled then
+            if not data.billboard or not data.billboard.Parent then
+                local bb, label = CreateBillboard(player)
+                bb.Adornee = root
+                bb.Parent = char
+                data.billboard = bb
+                data.label = label
+            end
+            data.label.Text = string.format("%s\n[%s]  %dm", player.Name, role, dist)
+            data.label.TextColor3 = color
+        elseif data.billboard then
+            data.billboard:Destroy()
+            data.billboard = nil
+            data.label = nil
+        end
+
+        -- Трейсеры
+        if TracersEnabled and ESPEnabled then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+            data.tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+            data.tracer.To = Vector2.new(screenPos.X, screenPos.Y)
+            data.tracer.Color = color
+            data.tracer.Visible = onScreen
+        else
+            data.tracer.Visible = false
+        end
+
+        -- Box ESP
+        if BoxEnabled and ESPEnabled then
+            local size = Vector3.new(3, 5.5, 3)
+            local cf = root.CFrame
+            local corners = {
+                cf * CFrame.new(-size.X/2,  size.Y/2, 0),
+                cf * CFrame.new( size.X/2,  size.Y/2, 0),
+                cf * CFrame.new(-size.X/2, -size.Y/2, 0),
+                cf * CFrame.new( size.X/2, -size.Y/2, 0)
+            }
+            local screen = {}
+            local allOnScreen = true
+            for i, corner in ipairs(corners) do
+                local sp, on = Camera:WorldToViewportPoint(corner.Position)
+                screen[i] = Vector2.new(sp.X, sp.Y)
+                if not on then allOnScreen = false end
+            end
+            if allOnScreen then
+                data.box.top.From = screen[1];    data.box.top.To = screen[2]
+                data.box.bottom.From = screen[3]; data.box.bottom.To = screen[4]
+                data.box.left.From = screen[1];   data.box.left.To = screen[3]
+                data.box.right.From = screen[2];  data.box.right.To = screen[4]
+                for _, line in pairs(data.box) do
+                    line.Color = color
+                    line.Visible = true
                 end
             else
-                if PlayerHighlights[player] then
-                    PlayerHighlights[player]:Destroy()
-                    PlayerHighlights[player] = nil
-                end
+                for _, line in pairs(data.box) do line.Visible = false end
             end
+        else
+            for _, line in pairs(data.box) do line.Visible = false end
         end
     end
 end
 
 local function UpdateGunESP()
     if not GunESPEnabled then
-        ClearGunESP()
+        ClearGuns()
         return
     end
-
-    -- Ищем пушки в мире и у игроков
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj.Name == "Gun" and (obj:IsA("Tool") or obj:IsA("Model") or obj:IsA("BasePart")) then
+        if obj.Name == "Gun" and (obj:IsA("Tool") or obj:IsA("Model")) then
             if not GunHighlights[obj] then
-                local target = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-                if target then
-                    GunHighlights[obj] = CreateHighlight(obj:IsA("Model") and obj or target, Colors.Gun, 0.4)
-                end
+                GunHighlights[obj] = CreateHighlight(obj, Colors.Gun)
             end
         end
     end
-
-    -- Чистим уничтоженные
-    for obj, hl in pairs(GunHighlights) do
+    for obj, h in pairs(GunHighlights) do
         if not obj or not obj.Parent then
-            if hl then hl:Destroy() end
+            if h then h:Destroy() end
             GunHighlights[obj] = nil
         end
     end
 end
 
--- Кнопки
-ESPButton.MouseButton1Click:Connect(function()
+-- ========== КНОПКИ ==========
+local function SetButtonState(btn, state, onText, offText)
+    if state then
+        btn.Text = onText
+        btn.BackgroundColor3 = Color3.fromRGB(35, 85, 50)
+    else
+        btn.Text = offText
+        btn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+    end
+end
+
+ESPBtn.MouseButton1Click:Connect(function()
     ESPEnabled = not ESPEnabled
-    if ESPEnabled then
-        ESPButton.Text = "ESP: ВКЛ"
-        ESPButton.BackgroundColor3 = Color3.fromRGB(40, 90, 50)
-    else
-        ESPButton.Text = "ESP: ВЫКЛ"
-        ESPButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-        ClearPlayerESP()
+    SetButtonState(ESPBtn, ESPEnabled, "ESP: ВКЛ", "ESP: ВЫКЛ")
+    if not ESPEnabled then
+        ClearAllPlayers()
+        TracersEnabled = false
+        BoxEnabled = false
+        SetButtonState(TracerBtn, false, "Трейсеры: ВКЛ", "Трейсеры: ВЫКЛ")
+        SetButtonState(BoxBtn, false, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
     end
 end)
 
-GunButton.MouseButton1Click:Connect(function()
+TracerBtn.MouseButton1Click:Connect(function()
+    if not ESPEnabled then return end
+    TracersEnabled = not TracersEnabled
+    SetButtonState(TracerBtn, TracersEnabled, "Трейсеры: ВКЛ", "Трейсеры: ВЫКЛ")
+end)
+
+BoxBtn.MouseButton1Click:Connect(function()
+    if not ESPEnabled then return end
+    BoxEnabled = not BoxEnabled
+    SetButtonState(BoxBtn, BoxEnabled, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+end)
+
+GunBtn.MouseButton1Click:Connect(function()
     GunESPEnabled = not GunESPEnabled
-    if GunESPEnabled then
-        GunButton.Text = "Gun ESP: ВКЛ"
-        GunButton.BackgroundColor3 = Color3.fromRGB(40, 90, 50)
-    else
-        GunButton.Text = "Gun ESP: ВЫКЛ"
-        GunButton.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-        ClearGunESP()
+    SetButtonState(GunBtn, GunESPEnabled, "Gun ESP: ВКЛ", "Gun ESP: ВЫКЛ")
+    if not GunESPEnabled then ClearGuns() end
+end)
+
+-- ===== ВЫБОР КЛАВИШИ =====
+KeybindBtn.MouseButton1Click:Connect(function()
+    if WaitingForKey then return end
+    WaitingForKey = true
+    KeybindBtn.Text = "Нажми любую клавишу..."
+    KeybindBtn.BackgroundColor3 = Color3.fromRGB(80, 60, 30)
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    -- Установка новой клавиши
+    if WaitingForKey and input.UserInputType == Enum.UserInputType.Keyboard then
+        Keybind = input.KeyCode
+        KeybindBtn.Text = "Keybind: " .. input.KeyCode.Name
+        KeybindBtn.BackgroundColor3 = Color3.fromRGB(32, 32, 40)
+        WaitingForKey = false
+        return
+    end
+
+    -- Срабатывание кейбинда
+    if not WaitingForKey and input.KeyCode == Keybind then
+        ESPEnabled = not ESPEnabled
+        SetButtonState(ESPBtn, ESPEnabled, "ESP: ВКЛ", "ESP: ВЫКЛ")
+        if not ESPEnabled then
+            ClearAllPlayers()
+            TracersEnabled = false
+            BoxEnabled = false
+            SetButtonState(TracerBtn, false, "Трейсеры: ВКЛ", "Трейсеры: ВЫКЛ")
+            SetButtonState(BoxBtn, false, "Box ESP: ВКЛ", "Box ESP: ВЫКЛ")
+        end
     end
 end)
 
--- Основной цикл
-RunService.Heartbeat:Connect(function()
-    if ESPEnabled then
-        UpdatePlayerESP()
-    end
-    if GunESPEnabled then
-        UpdateGunESP()
-    end
+Players.PlayerRemoving:Connect(ClearPlayer)
+
+RunService.RenderStepped:Connect(function()
+    if ESPEnabled then UpdateESP() end
+    if GunESPEnabled then UpdateGunESP() end
 end)
 
--- Очистка при выходе игроков
-Players.PlayerRemoving:Connect(function(player)
-    if PlayerHighlights[player] then
-        PlayerHighlights[player]:Destroy()
-        PlayerHighlights[player] = nil
-    end
-end)
-
-print("[MM2 ESP] Загружено успешно")
+print("[MM2 ESP] Загружено | Нажми на Keybind чтобы сменить клавишу")
